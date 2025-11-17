@@ -111,12 +111,6 @@ $navItems = [
     'active' => preg_match('#^/notes(/|$)#', $path),
   ],
   [
-    'label' => 'Photos',
-    'href'   => '/public_task_photos.php',
-    'icon'   => '📷',
-    'active' => preg_match('#photo#', $path),
-  ],
-  [
     'label' => 'Settings',
     'href'   => '/account/profile.php',
     'icon'   => '⚙️',

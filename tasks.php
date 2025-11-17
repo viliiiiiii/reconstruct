@@ -563,6 +563,9 @@ document.addEventListener('DOMContentLoaded', () => {
 document.addEventListener('DOMContentLoaded', () => {
   const modal     = document.getElementById('photoModal');
   const modalBody = document.getElementById('photoModalBody');
+  if (!modal || !modalBody) {
+    return;
+  }
 
   function openModal() {
     modal.classList.remove('hidden');

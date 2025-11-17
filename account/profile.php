@@ -1204,7 +1204,6 @@ include __DIR__ . '/../includes/header.php';
                     <p class="profile-insight__meta"><?php echo sanitize($insight['meta']); ?></p>
                   <?php endif; ?>
                 </div>
-                <div class="profile-meter__value"><?php echo $count; ?></div>
               </div>
             <?php endforeach; ?>
           </div>

@@ -13,6 +13,29 @@ const ready = (fn) => {
 
 const sidebarStorageKey = 'app:sidebar-collapsed';
 
+const storage = {
+  get(key) {
+    if (typeof window === 'undefined' || !window.localStorage) {
+      return null;
+    }
+    try {
+      return window.localStorage.getItem(key);
+    } catch (err) {
+      return null;
+    }
+  },
+  set(key, value) {
+    if (typeof window === 'undefined' || !window.localStorage) {
+      return;
+    }
+    try {
+      window.localStorage.setItem(key, value);
+    } catch (err) {
+      /* noop */
+    }
+  }
+};
+
 function initSidebar() {
   const shell = document.querySelector('.app-shell');
   const sidebar = document.querySelector('[data-sidebar]');
@@ -21,28 +44,39 @@ function initSidebar() {
   const overlay = document.querySelector('[data-sidebar-overlay]');
   if (!shell || !sidebar) return;
 
+  if (mobileToggle && !mobileToggle.hasAttribute('aria-expanded')) {
+    mobileToggle.setAttribute('aria-expanded', 'false');
+  }
+
   const applyCollapsed = (state) => {
+    const expanded = !state;
     shell.classList.toggle('sidebar-collapsed', state);
     shell.dataset.sidebarCollapsed = state ? 'true' : 'false';
+    if (collapseBtn) {
+      collapseBtn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    }
   };
 
-  const stored = localStorage.getItem(sidebarStorageKey);
-  applyCollapsed(stored === 'true');
+  const stored = storage.get(sidebarStorageKey);
+  const initialCollapsed = stored !== null ? stored === 'true' : window.innerWidth < 1280;
+  applyCollapsed(initialCollapsed);
 
   const toggleCollapsed = () => {
     const next = shell.dataset.sidebarCollapsed !== 'true';
     applyCollapsed(next);
-    localStorage.setItem(sidebarStorageKey, next ? 'true' : 'false');
+    storage.set(sidebarStorageKey, next ? 'true' : 'false');
   };
 
   const openMobile = () => {
     shell.classList.add('sidebar-open');
     if (overlay) overlay.classList.add('is-visible');
+    if (mobileToggle) mobileToggle.setAttribute('aria-expanded', 'true');
   };
 
   const closeMobile = () => {
     shell.classList.remove('sidebar-open');
     if (overlay) overlay.classList.remove('is-visible');
+    if (mobileToggle) mobileToggle.setAttribute('aria-expanded', 'false');
   };
 
   if (collapseBtn) {
@@ -96,7 +130,6 @@ function initCommandPalette() {
     { label: 'Rooms', url: '/rooms.php', group: 'Navigate' },
     { label: 'Inventory', url: '/inventory.php', group: 'Navigate' },
     { label: 'Notes', url: '/notes/index.php', group: 'Navigate' },
-    { label: 'Photos', url: '/public_task_photos.php', group: 'Navigate' },
     { label: 'Settings', url: '/account/profile.php', group: 'Navigate' },
   ];
 
