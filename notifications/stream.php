@@ -28,7 +28,7 @@ function sse_send(string $event, array $data, ?string $id = null, ?int $retryMs 
   @ob_flush(); @flush();
 }
 
-// Initial push (so the badge updates immediately)
+// Initial update (so the badge updates immediately)
 $last = notif_unread_count($userId);
 sse_send('count', ['count' => $last], (string)time());
 
