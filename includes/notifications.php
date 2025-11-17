@@ -98,21 +98,20 @@ function notif_resolve_local_user_ids(array $userIds): array {
     return array_values(array_unique($out));
 }
 
-/** Upsert per-type preference (web/email/push + mute) */
+/** Upsert per-type preference (web/email + mute) */
 function notif_set_type_pref(int $userId, string $type, array $prefs): void {
     $pdo = notif_pdo();
     $allow_web   = (int)($prefs['allow_web']   ?? 1);
     $allow_email = (int)($prefs['allow_email'] ?? 0);
-    $allow_push  = (int)($prefs['allow_push']  ?? 0);
     $mute_until  = $prefs['mute_until'] ?? null;
 
-    $sql = "INSERT INTO notification_type_prefs (user_id, notif_type, allow_web, allow_email, allow_push, mute_until)
-            VALUES (:u,:t,:w,:e,:p,:m)
+    $sql = "INSERT INTO notification_type_prefs (user_id, notif_type, allow_web, allow_email, mute_until)
+            VALUES (:u,:t,:w,:e,:m)
             ON DUPLICATE KEY UPDATE allow_web=VALUES(allow_web), allow_email=VALUES(allow_email),
-                                    allow_push=VALUES(allow_push), mute_until=VALUES(mute_until)";
+                                    mute_until=VALUES(mute_until)";
     $stmt = $pdo->prepare($sql);
     $stmt->execute([
-        ':u'=>$userId, ':t'=>$type, ':w'=>$allow_web, ':e'=>$allow_email, ':p'=>$allow_push, ':m'=>$mute_until
+        ':u'=>$userId, ':t'=>$type, ':w'=>$allow_web, ':e'=>$allow_email, ':m'=>$mute_until
     ]);
 }
 
@@ -125,13 +124,13 @@ function notif_get_type_pref(int $userId, string $type): array {
     }
 
     $pdo = notif_pdo();
-    $stmt = $pdo->prepare("SELECT allow_web, allow_email, allow_push, mute_until
+    $stmt = $pdo->prepare("SELECT allow_web, allow_email, mute_until
                            FROM notification_type_prefs
                            WHERE user_id=:u AND notif_type=:t");
     $stmt->execute([':u'=>$userId, ':t'=>$type]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$row) {
-        return $cache[$key] = ['allow_web'=>1,'allow_email'=>0,'allow_push'=>0,'mute_until'=>null];
+        return $cache[$key] = ['allow_web'=>1,'allow_email'=>0,'mute_until'=>null];
     }
     return $cache[$key] = $row;
 }
@@ -178,8 +177,6 @@ function notif_emit(array $args): ?int {
 
     $allow_web   = !empty($prefs['allow_web']);
     $allow_email = !empty($prefs['allow_email']);
-    $allow_push  = !empty($prefs['allow_push']);
-
     // Write the web notification row when allowed
     $notifId = null;
     if ($allow_web) {
@@ -200,12 +197,11 @@ function notif_emit(array $args): ?int {
         $notifId = (int)$pdo->lastInsertId();
     }
 
-    // Queue background channels (email/push) if allowed for this user+type
-    if ($notifId && ($allow_email || $allow_push)) {
+    // Queue background channels (email) if allowed for this user+type
+    if ($notifId && $allow_email) {
         $ins = $pdo->prepare("INSERT INTO notification_channels_queue (notification_id, channel, status, scheduled_at)
                               VALUES (:nid, :ch, 'pending', NULL)");
-        if ($allow_email) { $ins->execute([':nid'=>$notifId, ':ch'=>'email']); }
-        if ($allow_push)  { $ins->execute([':nid'=>$notifId, ':ch'=>'push']); }
+        $ins->execute([':nid'=>$notifId, ':ch'=>'email']);
     }
 
     return $notifId;
@@ -332,36 +328,4 @@ function notif_mark_all_read(int $userId): void {
     $pdo = notif_pdo();
     $sql = "UPDATE notifications SET is_read=1, read_at=NOW() WHERE user_id=:u AND is_read=0";
     $pdo->prepare($sql)->execute([':u' => $userId]);
-}
-function notif_touch_web_device(int $userId, string $userAgent): void {
-    $pdo = notif_pdo();
-    $ua   = substr($userAgent, 0, 255);
-
-    $sessionId = session_id();
-    if ($sessionId === '' || $sessionId === false) {
-        $sessionId = $_COOKIE['PHPSESSID'] ?? bin2hex(random_bytes(8));
-    }
-
-    $fingerprint = implode('|', [
-        (string)$userId,
-        (string)$sessionId,
-        substr((string)($_SERVER['REMOTE_ADDR'] ?? ''), 0, 45),
-        $ua,
-    ]);
-    $endpoint = 'internal-webpush://' . sha1($fingerprint);
-
-    $stmt = $pdo->prepare("
-        INSERT INTO notification_devices (user_id, kind, endpoint, user_agent, created_at, last_used_at)
-        VALUES (:u, 'webpush', :ep, :ua, NOW(), NOW())
-        ON DUPLICATE KEY UPDATE last_used_at = NOW(), user_agent = VALUES(user_agent), endpoint = VALUES(endpoint)
-    "
-    );
-
-    try {
-        $stmt->execute([':u' => $userId, ':ep' => $endpoint, ':ua' => $ua]);
-    } catch (Throwable $e) {
-        try {
-            error_log('notif_touch_web_device failed: ' . $e->getMessage());
-        } catch (Throwable $_) {}
-    }
 }

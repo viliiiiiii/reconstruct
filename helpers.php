@@ -104,16 +104,18 @@ if (!defined('HELPERS_BOOTSTRAPPED')) {
     }
 
     function flash_message(): void {
-    if (!empty($_SESSION['flash'])) {
+        if (empty($_SESSION['flash'])) {
+            return;
+        }
+
         $flash = $_SESSION['flash'];
         unset($_SESSION['flash']);
 
-        $type    = htmlspecialchars((string)($flash['type'] ?? 'success'), ENT_QUOTES, 'UTF-8');
-        $message = htmlspecialchars((string)($flash['message'] ?? ''),       ENT_QUOTES, 'UTF-8');
+        $type    = htmlspecialchars((string)($flash['type'] ?? 'info'), ENT_QUOTES, 'UTF-8');
+        $message = htmlspecialchars((string)($flash['message'] ?? ''), ENT_QUOTES, 'UTF-8');
 
-        echo '<div class="flash flash-', $type, '">', $message, '</div>';
+        echo '<div class="flash flash-', $type, '" data-flash-toast="', $type, '" role="alert">', $message, '</div>';
     }
-}
 
     /* ===== Auth & Session (CORE-first) ===== */
 
