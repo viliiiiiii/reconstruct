@@ -422,7 +422,6 @@ function profile_notification_summary(array $notificationPrefs): array
     $channels = [
         'in-app' => 0,
         'email'  => 0,
-        'push'   => 0,
     ];
     $snoozed = 0;
 
@@ -432,9 +431,6 @@ function profile_notification_summary(array $notificationPrefs): array
         }
         if (!empty($pref['allow_email'])) {
             $channels['email']++;
-        }
-        if (!empty($pref['allow_push'])) {
-            $channels['push']++;
         }
         if (!empty($pref['mute_until'])) {
             $snoozed++;
@@ -596,7 +592,6 @@ function profile_collect_insights(
         foreach ([
             'in-app' => 'In-app',
             'email'  => 'Email',
-            'push'   => 'Push',
         ] as $key => $label) {
             if (($summary['channels'][$key] ?? 0) > 0) {
                 $metaParts[] = $label;
@@ -658,7 +653,7 @@ function profile_collect_insights(
         'icon'    => '💡',
         'title'   => 'Trusted devices',
         'primary' => $deviceCount . ' connected',
-        'meta'    => $deviceMeta ? implode(' • ', $deviceMeta) : 'Add a browser or mobile device to receive push alerts.',
+        'meta'    => $deviceMeta ? implode(' • ', $deviceMeta) : 'Add a browser or mobile device to receive instant alerts.',
     ];
 
     $highlight = profile_security_highlight($securityEvents);
@@ -803,12 +798,11 @@ if (function_exists('notif_resolve_local_user_id')) {
                 try {
                     $pref = notif_get_type_pref($notificationUserId, $type);
                 } catch (Throwable $e) {
-                    $pref = ['allow_web' => 1, 'allow_email' => 0, 'allow_push' => 0, 'mute_until' => null];
+                    $pref = ['allow_web' => 1, 'allow_email' => 0, 'mute_until' => null];
                 }
                 $notificationPrefs[$type] = [
                     'allow_web'   => !empty($pref['allow_web']),
                     'allow_email' => !empty($pref['allow_email']),
-                    'allow_push'  => !empty($pref['allow_push']),
                     'mute_until'  => $pref['mute_until'] ?? null,
                 ];
             }
@@ -943,7 +937,6 @@ if (is_post()) {
                     $update = [
                         'allow_web'   => !empty($incoming['allow_web']) ? 1 : 0,
                         'allow_email' => !empty($incoming['allow_email']) ? 1 : 0,
-                        'allow_push'  => !empty($incoming['allow_push']) ? 1 : 0,
                     ];
 
                     $choice        = (string)($incoming['mute_for'] ?? 'off');
@@ -1036,12 +1029,11 @@ if (is_post()) {
             try {
                 $pref = notif_get_type_pref($notificationUserId, $type);
             } catch (Throwable $e) {
-                $pref = ['allow_web' => 1, 'allow_email' => 0, 'allow_push' => 0, 'mute_until' => null];
+                $pref = ['allow_web' => 1, 'allow_email' => 0, 'mute_until' => null];
             }
             $notificationPrefs[$type] = [
                 'allow_web'   => !empty($pref['allow_web']),
                 'allow_email' => !empty($pref['allow_email']),
-                'allow_push'  => !empty($pref['allow_push']),
                 'mute_until'  => $pref['mute_until'] ?? null,
             ];
         }
@@ -1212,7 +1204,6 @@ include __DIR__ . '/../includes/header.php';
                     <p class="profile-insight__meta"><?php echo sanitize($insight['meta']); ?></p>
                   <?php endif; ?>
                 </div>
-                <div class="profile-meter__value"><?php echo $count; ?></div>
               </div>
             <?php endforeach; ?>
           </div>
@@ -1313,7 +1304,7 @@ include __DIR__ . '/../includes/header.php';
             </div>
             <div class="profile-panel__body pref-list">
               <?php foreach ($notificationTypes as $type => $meta):
-                $pref      = $notificationPrefs[$type] ?? ['allow_web' => true, 'allow_email' => false, 'allow_push' => false, 'mute_until' => null];
+                $pref      = $notificationPrefs[$type] ?? ['allow_web' => true, 'allow_email' => false, 'mute_until' => null];
                 $muteState = profile_mute_field_state($pref['mute_until']);
                 $fieldKey  = preg_replace('/[^a-z0-9]+/i', '_', $type);
                 $hasExistingMute = !empty($pref['mute_until']) && $muteState['select'] !== 'off';
@@ -1341,11 +1332,6 @@ include __DIR__ . '/../includes/header.php';
                       <input type="checkbox" name="prefs[<?php echo sanitize($type); ?>][allow_email]" value="1"<?php echo $pref['allow_email'] ? ' checked' : ''; ?>>
                       <span class="switch__control" aria-hidden="true"></span>
                       <span class="switch__label">Email</span>
-                    </label>
-                    <label class="switch">
-                      <input type="checkbox" name="prefs[<?php echo sanitize($type); ?>][allow_push]" value="1"<?php echo $pref['allow_push'] ? ' checked' : ''; ?>>
-                      <span class="switch__control" aria-hidden="true"></span>
-                      <span class="switch__label">Push</span>
                     </label>
                   </div>
                   <div class="pref-row__mute">
@@ -1414,15 +1400,15 @@ include __DIR__ . '/../includes/header.php';
           </div>
           <div class="profile-panel__body">
             <?php if (!$notificationsAvailable): ?>
-              <p class="muted">Connect a device to enable web or push notifications.</p>
+              <p class="muted">Connect a device to enable in-app notifications.</p>
             <?php elseif ($notificationDevices): ?>
               <ul class="device-list">
                 <?php foreach ($notificationDevices as $device):
-                  $kind = (string)($device['kind'] ?? 'webpush');
+                  $kind = (string)($device['kind'] ?? 'web');
                   $kindLabel = match ($kind) {
-                    'fcm'  => 'Android push',
-                    'apns' => 'iOS push',
-                    default => 'Web push',
+                    'fcm'  => 'Android device',
+                    'apns' => 'iOS device',
+                    default => 'Web session',
                   };
                   $lastUsed = $device['last_used_at'] ?? $device['created_at'] ?? null;
                   $lastRelative = profile_relative_time($lastUsed);
@@ -1499,7 +1485,6 @@ include __DIR__ . '/../includes/header.php';
               <?php foreach ([
                 'in-app' => 'In-app',
                 'email'  => 'Email',
-                'push'   => 'Push',
               ] as $key => $label):
                 $count = (int)($notificationSummary['channels'][$key] ?? 0);
                 $ratio = ($notificationSummary['total_types'] > 0)
